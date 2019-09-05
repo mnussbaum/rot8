@@ -6,10 +6,38 @@ use std::thread;
 use std::time::Duration;
 use std::process::Command;
 use glob::glob;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct SwayOutput {
+    name: String,
+    transform: String,
+}
+
+fn get_sway_transform(display: &str) -> Result<String, String> {
+    let raw_rotation_state = String::from_utf8(Command::new("swaymsg")
+        .arg("-t")
+        .arg("get_outputs")
+        .arg("--raw")
+        .output()
+        .expect("Swaymsg get outputs command failed to start")
+       .stdout).unwrap();
+    let deserialized: Vec<SwayOutput> = serde_json::from_str(&raw_rotation_state).unwrap();
+    let mut transform = "".to_owned();
+    for output in deserialized {
+       if output.name == display {
+           transform = output.transform
+       }
+    }
+    if transform == "" {
+       panic!()
+    }
+
+    return Ok(transform);
+}
 
 fn main() {
     let mut mode = "";
-    let mut old_state = "normal";
     let mut new_state: &str;
     let mut path_x: String = "".to_string();
     let mut path_y: String = "".to_string();
@@ -59,6 +87,8 @@ fn main() {
     let sleep = matches.value_of("sleep").unwrap_or("default.conf");
     let display = matches.value_of("display").unwrap_or("default.conf");
     let touchscreen = matches.value_of("touchscreen").unwrap_or("default.conf"); 
+    let old_state_owned = get_sway_transform(display).unwrap();
+    let mut old_state = old_state_owned.as_str();
 
     for entry in  glob("/sys/bus/iio/devices/iio:device*/in_accel_*_raw").unwrap(){
         match entry  {
