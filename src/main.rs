@@ -6,6 +6,7 @@ use std::thread;
 use std::time::Duration;
 use std::process::Command;
 use glob::glob;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -15,25 +16,55 @@ struct SwayOutput {
 }
 
 fn get_window_manager_state(display: &str, mode: &str) -> Result<String, String> {
-    let raw_rotation_state = String::from_utf8(Command::new("swaymsg")
-        .arg("-t")
-        .arg("get_outputs")
-        .arg("--raw")
-        .output()
-        .expect("Swaymsg get outputs command failed to start")
-       .stdout).unwrap();
-    let deserialized: Vec<SwayOutput> = serde_json::from_str(&raw_rotation_state).unwrap();
-    let mut transform = "".to_owned();
-    for output in deserialized {
-       if output.name == display {
-           transform = output.transform
-       }
-    }
-    if transform == "" {
-       panic!()
-    }
+    if mode == "sway" {
+        let raw_rotation_state = String::from_utf8(Command::new("swaymsg")
+            .arg("-t")
+            .arg("get_outputs")
+            .arg("--raw")
+            .output()
+            .expect("Swaymsg get outputs command failed to start")
+            .stdout).unwrap();
+        let deserialized: Vec<SwayOutput> = serde_json::from_str(&raw_rotation_state).unwrap();
+        let mut transform = "".to_owned();
+        for output in deserialized {
+            if output.name == display {
+                transform = output.transform
+            }
+        }
+        if transform == "" {
+            panic!()
+        }
 
-    return Ok(transform);
+        return Ok(transform);
+    } else if mode == "x" {
+        let raw_rotation_state = String::from_utf8(Command::new("xrandr")
+            .output()
+            .expect("Xrandr get outputs command failed to start")
+            .stdout).unwrap();
+        let mut transform = "".to_owned();
+        for xrandr_output_line in raw_rotation_state.split("\n") {
+            if xrandr_output_line.contains(display) {
+                println!("{:?}", xrandr_output_line);
+                // eDP-1 connected primary 3200x1800+0+0 (normal left inverted right x axis y axis) 294mm x 165mm
+                // let re = Regex::new(format!(r"^{:?} connected \d+x\d+\+\d+\+\d+ (normal|inverted|left|right) \(.+\).*", display).as_str()).unwrap();
+                // let hmm = format!("^{}.*(normal|inverted|left|right).*", regex::escape(display));
+                let re = Regex::new(format!(
+                    r"^{} connected .* (normal|inverted|left|right) \(.*\) .*",
+                    regex::escape(display),
+                ).as_str()).unwrap();
+                for capture in re.captures_iter(xrandr_output_line) {
+                    println!("{:?}", capture);
+                }
+            }
+        }
+        if transform == "" {
+            panic!()
+        }
+
+        return Ok(transform);
+    } else {
+        panic!()
+    }
 }
 
 fn main() {
@@ -51,7 +82,7 @@ fn main() {
                             .stdout).unwrap();
 
     let x_pid = String::from_utf8(Command::new("pidof")
-                            .arg("x")
+                            .arg("Xorg")
                             .output()
                             .unwrap()
                             .stdout).unwrap();
