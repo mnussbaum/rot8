@@ -14,7 +14,7 @@ struct SwayOutput {
     transform: String,
 }
 
-fn get_sway_transform(display: &str) -> Result<String, String> {
+fn get_window_manager_state(display: &str, mode: &str) -> Result<String, String> {
     let raw_rotation_state = String::from_utf8(Command::new("swaymsg")
         .arg("-t")
         .arg("get_outputs")
@@ -87,7 +87,7 @@ fn main() {
     let sleep = matches.value_of("sleep").unwrap_or("default.conf");
     let display = matches.value_of("display").unwrap_or("default.conf");
     let touchscreen = matches.value_of("touchscreen").unwrap_or("default.conf"); 
-    let old_state_owned = get_sway_transform(display).unwrap();
+    let old_state_owned = get_window_manager_state(display, mode).unwrap();
     let mut old_state = old_state_owned.as_str();
 
     for entry in  glob("/sys/bus/iio/devices/iio:device*/in_accel_*_raw").unwrap(){
